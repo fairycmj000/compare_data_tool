@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据对比</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; padding: 40px 20px; color: #333; }
+.container { max-width: 100%; margin: 0 auto; padding: 0 20px; }
+h1 { font-size: 24px; margin-bottom: 8px; color: #1a1a1a; padding: 2px 6px; margin-left: -6px; border: 1px solid transparent; border-radius: 4px; outline: none; transition: border 0.15s; }
+h1:hover { border-color: #d2e3fc; }
+h1:focus { border-color: #4f8ef7; background: #fff; box-shadow: 0 0 0 2px rgba(79,142,247,0.12); }
+.subtitle { color: #666; font-size: 14px; }
+.header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
+.rule-section { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.rule-section h2 { font-size: 16px; color: #1a1a1a; margin-bottom: 16px; border-left: 4px solid #4f8ef7; padding-left: 12px; }
+.field { font-family: monospace; background: #f0f0f0; padding: 1px 6px; border-radius: 3px; }
+.data-table { width: auto; border-collapse: collapse; margin-top: 16px; table-layout: auto; min-width: 100%; }
+.data-table th { background: #4f8ef7; color: #fff; padding: 10px 14px; text-align: left; font-size: 13px; white-space: nowrap; position: relative; }
+.data-table td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 13px; min-width: 120px; max-width: 250px; word-wrap: break-word; overflow-wrap: break-word; }
+.data-table tr:hover td { background: #f8fafd; }
+.data-table .num { text-align: left; font-weight: 400; }
+.diff-match { color: #137333; }
+.diff-mismatch { color: #c5221f; font-weight: 700; }
+.diff-missing { color: #aaa; font-style: italic; }
+.diff-only { color: #f59e0b; font-weight: 700; }
+.diff-field-only { background: #fff3e0; }
+.compare-tab { font-size:13px; font-weight:700; color:#555; margin-left:8px; border-bottom:2px solid #d2e3fc; outline:none; min-width:60px; display:inline-block; text-align:center; padding:2px 8px; background:#f8fafd; border-radius:4px 4px 0 0; vertical-align:bottom; }
+.compare-tab:hover { border-bottom-color:#4f8ef7; }
+.compare-tab:focus { border-bottom-color:#4f8ef7; color:#1967d2; background:#e8f0fe; }
+
+.upload-preview-row { display: grid; grid-template-columns: 1fr 4fr; gap: 16px; margin-bottom: 16px; align-items: stretch; min-height: 120px; }
+@media (max-width: 640px) { .upload-preview-row { grid-template-columns: 1fr; min-height: auto; } }
+.upload-preview-row .upload-card { margin: 0; }
+.upload-preview-row .preview-box { overflow: hidden; }
+.upload-preview-row .preview-box.has-data { min-height: 80px; max-height: 200px; }
+.upload-card { background: #fff; border: 2px dashed #d2e3fc; border-radius: 8px; padding: 18px 14px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+.upload-card:hover { border-color: #4f8ef7; background: #f8fafd; }
+.upload-card.dragover { border-color: #4f8ef7; background: #e8f0fe; }
+.upload-card .icon { font-size: 28px; margin-bottom: 6px; }
+.upload-card .card-title { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+.upload-card .text { font-size: 12px; color: #666; line-height: 1.5; }
+.upload-card .text strong { color: #4f8ef7; }
+.upload-card input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-card .file-info { margin-top: 8px; font-size: 11px; color: #137333; display: none; word-break: break-all; position: relative; z-index: 2; }
+.upload-card .file-info.show { display: block; }
+.upload-card.source { border-color: #b7d4fc; }
+.upload-card.compare { border-color: #fcd5b7; }
+.upload-card.compare:hover { border-color: #f59e0b; background: #fffbf5; }
+.upload-card.compare .text strong { color: #f59e0b; }
+
+.preview-box { background: #fff; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.preview-box .preview-placeholder { flex:1; display:flex; align-items:center; justify-content:center; color:#bbb; font-size:12px; }
+.preview-box.has-data .preview-placeholder { display:none; }
+.preview-box .preview-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.preview-box h3 { font-size: 13px; color: #1a1a1a; margin-bottom: 6px; border-left: 3px solid #4f8ef7; padding-left: 8px; }
+.preview-wrap { flex: 1; overflow: auto; border: 1px solid #eee; border-radius: 4px; }
+.preview-table { width: 100%; border-spacing: 0; font-size: 11px; }
+.preview-table th { background: #f0f4f8; color: #333; padding: 5px 7px; text-align: left; border-bottom: 2px solid #d2e3fc; white-space: nowrap; position: sticky; top: 0; z-index:2; }
+.preview-table td { padding: 4px 7px; border-bottom: 1px solid #eee; word-break: break-all; white-space: normal; }
+
+.key-config { margin-top: 12px; padding: 12px 16px; background: #f8fafd; border: 1px solid #e8f0fe; border-radius: 6px; display: none; }
+.key-config.show { display: block; }
+.key-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.key-col h2 { font-size: 14px !important; margin-bottom: 4px !important; }
+.key-dropdown { position: relative; width: 100%; }
+.key-dropdown-trigger { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-height: 34px; padding: 4px 30px 4px 8px; border: 1px solid #d2e3fc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; }
+.key-dropdown-trigger:hover { border-color: #4f8ef7; }
+.key-dropdown-trigger .placeholder { color: #aaa; }
+.key-tag { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; background: #e8f0fe; color: #1967d2; border-radius: 3px; font-size: 12px; font-weight: 600; }
+.key-tag .rm { cursor: pointer; font-size: 14px; line-height: 1; color: #1967d2; }
+.key-tag .rm:hover { color: #c5221f; }
+.key-dropdown-trigger .arrow { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 10px; color: #888; transition: transform 0.2s; }
+.key-dropdown.open .key-dropdown-trigger .arrow { transform: translateY(-50%) rotate(180deg); }
+.key-dropdown-menu { display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid #d2e3fc; border-radius: 0 0 4px 4px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.key-dropdown.open .key-dropdown-menu { display: block; }
+.key-dropdown-item { padding: 6px 12px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.key-dropdown-item:hover { background: #f0f4f8; }
+.key-dropdown-item.selected { background: #e8f0fe; color: #1967d2; font-weight: 600; }
+.key-dropdown-item .check-icon { font-size: 12px; visibility: hidden; }
+.key-dropdown-item.selected .check-icon { visibility: visible; }
+.key-actions { margin-top: 10px; }
+
+.btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; transition: all 0.15s; }
+.btn-primary { background: #4f8ef7; color: #fff; }
+.btn-primary:hover { background: #3b7ae0; }
+.btn-primary:disabled { background: #c0c8d4; color: #888; cursor: not-allowed; }
+.btn-secondary { background: #fff; color: #555; border: 1px solid #ddd; }
+.btn-secondary:hover { background: #f8f8f8; border-color: #bbb; }
+
+.badge-gt0 { background: #e6f4ea; color: #137333; padding: 2px 10px; border-radius: 12px; font-size: 13px; }
+.badge-eq0 { background: #fce8e6; color: #c5221f; padding: 2px 10px; border-radius: 12px; font-size: 13px; }
+.share-btn { padding: 8px 16px; font-size: 13px; font-weight: 700; white-space: nowrap; background: #4f8ef7; color: #fff; border: 1px solid #3b7ae0; border-radius: 4px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+.share-btn:hover { background: #3b7ae0; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.share-btn .share-icon { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -2px; position: relative; border: 1.5px solid #fff; border-radius: 50%; }
+.share-btn .share-icon::before { content: ''; position: absolute; top: -4px; left: 4px; width: 6px; height: 6px; border: 1.5px solid #fff; border-radius: 50%; background: #4f8ef7; }
+.share-btn .share-icon::after { content: ''; position: absolute; bottom: -4px; right: -2px; width: 6px; height: 6px; border: 1.5px solid #fff; border-radius: 50%; background: #4f8ef7; }
+.share-toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #333; color: #fff; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 9999; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+.share-toast.show { display: block; animation: fadeout 2s 1s forwards; }
+@keyframes fadeout { to { opacity: 0; } }
+
+.diff-section-title { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-top: 16px; }
+.diff-stats { display: flex; gap: 20px; margin: 10px 0; }
+.stat-box { padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+.stat-match { background: #e6f4ea; color: #137333; }
+.stat-mismatch { background: #fce8e6; color: #c5221f; }
+.stat-skip { background: #f0f4f8; color: #555; }
+
+/* Workflow */
+.workflow { display: flex; align-items: center; gap: 0; margin: 0 0 16px; flex-wrap: wrap; justify-content: space-between; }
+.workflow-step { display: flex; align-items: center; background: #fff; border: 1px solid #e0e4ea; border-radius: 8px; padding: 10px 12px; flex: 0 1 auto; min-width: 120px; }
+.workflow-step .step-num { width: 20px; height: 20px; background: #4f8ef7; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-right: 6px; }
+.workflow-step .step-text { font-size: 11px; color: #333; line-height: 1.3; }
+.workflow-step .step-text strong { display: block; font-size: 11px; color: #1a1a1a; }
+.workflow-line { flex: 1 1 0; height: 2px; background: #d2e3fc; min-width: 4px; align-self: center; }
+.workflow-step.active { border-color: #4f8ef7; background: #f0f7ff; }
+.workflow-step.done { border-color: #137333; background: #e6f4ea; }
+.workflow-step.done .step-num { background: #137333; }
+
+@media (max-width: 900px) {
+  .workflow-step { flex: 0 1 auto; min-width: 100px; padding: 8px 10px; }
+  .workflow-line { min-width: 2px; }
+}
+@media (max-width: 640px) {
+  .workflow { gap: 4px; }
+  .workflow-step { flex: 0 1 auto; min-width: 80px; padding: 6px 8px; }
+  .workflow-step .step-text { font-size: 10px; }
+  .workflow-step .step-text strong { font-size: 10px; }
+  .workflow-line { display: none; }
+}
+
+.col-resizer { position: absolute; right: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; background: transparent; z-index: 1; }
+.col-resizer:hover, .col-resizer.active { background: #4f8ef7; }
+
+/* Manual sub-cards */
+.manual-sub { flex: 1; background: #fff; border: 1px dashed #c9b7fc; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; min-height: 0; }
+.manual-sub .sub-title { font-size: 12px; font-weight: 600; color: #5b3aa0; margin-bottom: 4px; }
+.sql-block { background: #faf7ff; color: #333; border: 1px dashed #c9b7fc; border-radius: 6px; padding: 8px; display: flex; font-size: 13px; line-height: 1.6; overflow-y: auto; position: relative; white-space: pre-wrap; word-break: break-all; min-height: 100px; max-height: 200px; flex: 1; }
+.sql-block.expanded { max-height: none; }
+.sql-block .copy-btn { position: absolute; top: 8px; right: 8px; background: #fff; border: 1px solid #d2e3fc; color: #555; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+.sql-block .copy-btn:hover { background: #f0f4f8; border-color: #4f8ef7; color: #4f8ef7; }
+.sql-block .sql-edit-btn { position: absolute; top: 8px; right: 60px; background: #fff; border: 1px solid #d2e3fc; color: #555; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+.sql-block .sql-edit-btn:hover { background: #f0f4f8; border-color: #4f8ef7; color: #4f8ef7; }
+.sql-block .sql-expand-btn { position: absolute; top: 8px; right: 110px; background: #fff; border: 1px solid #d2e3fc; color: #555; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+.sql-block .sql-expand-btn:hover { background: #f0f4f8; border-color: #4f8ef7; color: #4f8ef7; }
+.sql-block textarea.sql-editor { width: 100%; min-height: 80px; height: 100%; background: #fff; color: #333; border: 1px solid #c9b7fc; border-radius: 4px; padding: 8px; font-size: 13px; line-height: 1.6; resize: none; outline: none; box-sizing: border-box; text-align: center; align-content: center; }
+.sql-block textarea.sql-editor:focus { border-color: #8b5cf6; text-align: left; }
+.sql-block textarea.sql-editor:not(:placeholder-shown) { text-align: left; align-content: normal; }
+.sql-block textarea.sql-editor::placeholder { color: #aaa; font-size: 11px; }
+.image-paste-area { flex: 1; min-height: 100px; max-height: 200px; border: 1px dashed #e9defb; border-radius: 4px; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; overflow-y: auto; background: #faf7ff; cursor: pointer; align-content: flex-start; }
+.image-paste-area:focus { outline: none; border-color: #8b5cf6; }
+.image-paste-area .placeholder { color: #aaa; font-size: 11px; text-align: center; width: 100%; display: flex; align-items: center; justify-content: center; height: 100%; }
+.image-thumb { position: relative; border: 1px solid #e9defb; border-radius: 4px; overflow: hidden; max-width: 100%; cursor: zoom-in; }
+.image-thumb img { max-width: 100%; max-height: 120px; display: block; }
+.image-thumb .rm-btn { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; cursor: pointer; font-size: 11px; line-height: 18px; text-align: center; }
+.image-lightbox { position: fixed; inset: 0; z-index: 10001; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.image-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+
+.sql-act-btn { padding: 5px 12px; border: 1px solid #d2e3fc; border-radius: 3px; background: #fff; font-size: 10px; font-weight: 700; cursor: pointer; color: #555; }
+.sql-act-btn:hover { background: #f0f4f8; border-color: #4f8ef7; color: #4f8ef7; }
+.shared-mode .sql-edit-btn2 { display: none; }
+.shared-mode .header-btns { display: none; }
+.shared-mode #pageTitle { pointer-events: none; }
+.shared-mode #pageTitle ~ span { display: none; }
+.shared-mode .compare-tab { pointer-events: none; }
+.shared-mode .image-paste-area { cursor: default; }
+.shared-mode .image-thumb .rm-btn { display: none; }
+.shared-mode #imageFileInput { display: none !important; }
+.shared-mode .upload-card input[type="file"] { display: none !important; }
+.shared-mode .upload-card { cursor: default; }
+.shared-mode #attInput { display: none !important; }
+.shared-mode #attPasteArea { cursor: default; }
+.shared-mode .key-dropdown-trigger { pointer-events: none; cursor: default; }
+.shared-mode .key-tag .rm { display: none; }
+.shared-mode #btnCompare { display: none !important; }
+
+.fullscreen-btn { background:#4f8ef7; border:2px solid #4f8ef7; border-radius:4px; padding:4px 10px; font-size:13px; font-weight:700; cursor:pointer; color:#fff; display:none; }
+.preview-box.has-data .fullscreen-btn { display:inline-block; }
+.fullscreen-btn:hover { background:#3b7ae0; border-color:#3b7ae0; }
+.preview-fullscreen { position:fixed; inset:0; z-index:10000; background:#fff; padding:24px; display:flex; flex-direction:column; }
+.preview-fullscreen .preview-wrap { flex:1; max-height:none; overflow:auto; }
+.fs-hl { background: #fff3cd; }
+.fs-hl-current { background: #ffc107; }
+.fs-match-text { font-weight: 700; font-size: 14px; background: #ffff00; border-radius: 2px; }
+.preview-fullscreen .preview-table th { position:sticky; top:0; z-index:2; }
+
+/* Column filter */
+.col-filter-btn { display: inline-block; margin-left: 9px; cursor: pointer; vertical-align: middle; }
+.col-filter-btn:hover, .col-filter-btn.active { color: #4f8ef7; }
+.col-filter-btn.filtering svg polygon { stroke: #e65100; }
+.col-filter-popup { display: none; position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #d2e3fc; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 50; padding: 6px 8px; width: 350px; height: 50px; align-items: center; }
+.col-filter-popup.show { display: flex; gap: 4px; }
+.col-filter-popup input { flex: 1; padding: 3px 6px; border: 1px solid #d2e3fc; border-radius: 3px; font-size: 11px; outline: none; width: 100px; }
+.col-filter-popup input:focus { border-color: #4f8ef7; }
+.col-filter-popup .clear-btn { background: none; border: none; color: #aaa; cursor: pointer; font-size: 14px; padding: 0 2px; }
+.col-filter-popup .clear-btn:hover { color: #c5221f; }
+.filter-count { font-size: 14px; font-weight: 700; color: #e65100; margin-left: 8px; }
+.filtered-row { display: none; }
+</style>
+</head>
+<body>
+<div class="container" id="container">
+  <div class="header-row">
+    <div>
+      <div style="flex:1;text-align:center;"><h1 id="pageTitle" contenteditable="true" spellcheck="false" onblur="saveTitle()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" title="点击编辑标题，回车保存" style="display:inline;">数据对比</h1> <span style="font-size:11px;color:#f59e0b;">可点击进行修改</span></div>
+    </div>
+    <div style="display:flex;gap:12px;" class="header-btns"><button class="btn btn-secondary" id="btnCompareToggle" onclick="toggleCompare()" style="background:#4f8ef7;color:#fff;font-weight:700;border:1px solid #4f8ef7;display:none;">数据对比</button><button class="btn btn-secondary" id="btnNote" onclick="toggleNote()" style="background:#8b5cf6;border:1px solid #7c3aed;box-shadow:0 1px 2px rgba(0,0,0,0.12);font-weight:700;color:#fff;display:none;">关闭备注</button><button class="btn btn-secondary share-btn" id="btnShare"><span class="share-icon"></span>分享</button></div>
+  </div>
+
+  <div class="share-toast" id="shareToast">已复制分享链接到剪贴板</div>
+
+    <!-- 文件上传 -->
+  <div class="rule-section" id="uploadSection" style="margin-bottom:16px;">
+    <h2>&#128193; 数据对比 <span class="compare-tab" contenteditable="true" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" title="自定义命名，回车保存">数据对比1</span></h2>
+    <div class="workflow" id="workflow">
+      <div class="workflow-step" id="wf1"><span class="step-num">1</span><span class="step-text"><strong>上传基准数据(A)</strong>作为正确标准</span></div>
+      <span class="workflow-line"></span>
+      <div class="workflow-step" id="wf2"><span class="step-num">2</span><span class="step-text"><strong>上传对比数据(B)</strong>待核查的数据</span></div>
+      <span class="workflow-line"></span>
+      <div class="workflow-step" id="wf3"><span class="step-num">3</span><span class="step-text"><strong>设置唯一键</strong>选择匹配字段</span></div>
+      <span class="workflow-line"></span>
+      <div class="workflow-step" id="wf4"><span class="step-num">4</span><span class="step-text"><strong>选择对比字段</strong>可选，默认全比</span></div>
+      <span class="workflow-line"></span>
+      <div class="workflow-step" id="wf5"><span class="step-num">5</span><span class="step-text"><strong>执行核对</strong>开始自动比对</span></div>
+      <span class="workflow-line"></span>
+      <div class="workflow-step" id="wf6"><span class="step-num">6</span><span class="step-text"><strong>查看差异结果</strong>定位数据问题</span></div>
+    </div>
+  <!-- 数据源文件 -->
+  <div class="upload-preview-row">
+    <div class="upload-card source" id="uploadCard">
+      <div class="icon">&#128202;</div>
+      <div class="card-title">基准数据（A）</div>
+      <div class="text">上传基准数据文件 (.xlsx)，作为<strong>正确标准</strong></div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <div class="file-info" id="fileInfo"></div>
+    </div>
+    <div class="preview-box" id="previewSection">
+      <div style="display:flex;gap:8px;align-items:center;margin-top:-14px;margin-bottom:11px;">
+        <span style="font-size:13px;font-weight:600;color:#1a1a1a;border-left:3px solid #4f8ef7;padding-left:8px;margin-right:8px;">读取配置</span>
+        <span style="font-size:11px;color:#555;">起始行:</span><input type="number" id="srcHeaderRow" value="1" min="1" style="width:84px;padding:4px 6px;border:2px solid #7eb4f2;border-radius:3px;font-size:11px;" onchange="reprocessFiles()">
+        <span style="font-size:11px;color:#555;">起始列:</span><input type="number" id="srcDataStartCol" value="1" min="1" style="width:84px;padding:4px 6px;border:2px solid #7eb4f2;border-radius:3px;font-size:11px;" onchange="reprocessFiles()">
+      </div>
+      <div class="preview-header"><h3>基准数据预览</h3><div style="display:flex;align-items:center;gap:8px;"><span class="preview-info" id="previewInfo" style="display:none;font-size:11px;color:#888;"></span><button class="fullscreen-btn" onclick="openFullscreen(this)">&#9974; 全屏</button></div></div>
+      <div class="preview-placeholder">上传文件后在此预览数据</div>
+      <div class="preview-wrap" style="display:none;"><table class="preview-table" id="previewTable"></table></div>
+    </div>
+  </div>
+
+  <!-- 对比数据文件 -->
+  <div class="upload-preview-row">
+    <div class="upload-card compare" id="uploadCardCompare">
+      <div class="icon">&#128203;</div>
+      <div class="card-title">对比数据（B）</div>
+      <div class="text">上传待核对数据文件 (.xlsx)，作为<strong>被核查方</strong></div>
+      <input type="file" id="fileInputCompare" accept=".xlsx,.xls">
+      <div class="file-info" id="fileInfoCompare"></div>
+    </div>
+    <div class="preview-box" id="previewSectionCompare">
+      <div style="display:flex;gap:8px;align-items:center;margin-top:-14px;margin-bottom:11px;">
+        <span style="font-size:13px;font-weight:600;color:#1a1a1a;border-left:3px solid #4f8ef7;padding-left:8px;margin-right:8px;">读取配置</span>
+        <span style="font-size:11px;color:#555;">起始行:</span><input type="number" id="cmpHeaderRow" value="1" min="1" style="width:84px;padding:4px 6px;border:2px solid #f59e0b;border-radius:3px;font-size:11px;" onchange="reprocessFiles()">
+        <span style="font-size:11px;color:#555;">起始列:</span><input type="number" id="cmpDataStartCol" value="1" min="1" style="width:84px;padding:4px 6px;border:2px solid #f59e0b;border-radius:3px;font-size:11px;" onchange="reprocessFiles()">
+      </div>
+      <div class="preview-header"><h3>对比数据预览</h3><div style="display:flex;align-items:center;gap:8px;"><span class="preview-info" id="previewInfoCompare" style="display:none;font-size:11px;color:#888;"></span><button class="fullscreen-btn" onclick="openFullscreen(this)">&#9974; 全屏</button></div></div>
+      <div class="preview-placeholder">上传文件后在此预览数据</div>
+      <div class="preview-wrap" style="display:none;"><table class="preview-table" id="previewTableCompare"></table></div>
+    </div>
+  </div>
+  </div>
+
+
+  <!-- 唯一键配置 -->
+  <div class="rule-section" id="keyConfigSection" style="display:none;">
+    <div class="key-row">
+      <div class="key-col">
+        <h2>&#128273; 设置唯一键</h2>
+        <p style="font-size:13px;color:#666;margin-bottom:12px;">选择匹配两表记录的字段（可多选，拼接为组合键）</p>
+        <div class="key-dropdown" id="keyDropdown">
+          <div class="key-dropdown-trigger" onclick="event.stopPropagation();toggleDD('keyDropdown')">
+            <span class="placeholder" id="keyPlaceholder">请选择唯一键字段...</span>
+            <span class="arrow">&#9660;</span>
+          </div>
+          <div class="key-dropdown-menu" id="keyDropdownMenu"></div>
+        </div>
+      </div>
+      <div class="key-col">
+        <h2>&#128269; 对比字段范围（可选）</h2>
+        <p style="font-size:13px;color:#666;margin-bottom:12px;">选择需核对的字段，<strong>不选则默认对比全部同名字段</strong></p>
+        <div class="key-dropdown" id="fieldDropdown">
+          <div class="key-dropdown-trigger" onclick="event.stopPropagation();toggleDD('fieldDropdown')">
+            <span class="placeholder" id="fieldPlaceholder">默认对比全部同名字段...</span>
+            <span class="arrow">&#9660;</span>
+          </div>
+          <div class="key-dropdown-menu" id="fieldDropdownMenu"></div>
+        </div>
+      </div>
+    </div>
+    <div class="key-actions" style="margin-top:12px;display:flex;justify-content:flex-end;align-items:center;">
+      <span id="keyDisplay" style="margin-right:12px;font-size:13px;color:#888;"></span>
+      <button class="btn btn-primary" id="btnCompare" onclick="applyKeyAndCompare()" disabled>&#10004; 执行核对</button>
+    </div>
+  </div>
+  <!-- 核对结果 -->
+  <div class="rule-section" id="diffSection" style="display:none;">
+    <h2>&#128270; 核对结果</h2>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;line-height:1.6;">核对结果说明：字段存在但值为空显示<span style="color:#aaa;font-style:italic;">null</span>灰色，A/B两值一致显示<span style="color:#137333;">绿色</span>，不一致显示<span style="color:#c5221f;">红色加粗</span>；字段不存在时A列显示<span style="color:#137333;">(参考标准文件无此字段)</span>绿色，B列显示<span style="color:#f59e0b;">(被核对文件无此字段)</span>橙色；记录不存在时显示<span style="color:#f59e0b;">(无此记录)</span>橙色；唯一键值为空的记录跳过。<br>筛选说明：点击列头<span style="background:#4f8ef7;color:#fff;padding:1px 6px;border-radius:2px;font-size:10px;">漏斗</span>可按该字段模糊筛选，输入关键字后仅显示匹配行并标注匹配行数，筛选后漏斗变为深橙色。</div>
+    <div class="diff-stats" id="diffStats"></div>
+    <div style="overflow-x:auto; margin-top:16px;" id="diffTableContainer">
+      <table class="data-table" id="diffTable">
+        <thead id="diffHead"></thead>
+        <tbody id="diffBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <!-- 备注 -->
+  <div class="rule-section" id="noteSection" style="display:block;">
+    <h2>&#128221; 备注</h2>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; align-items:start;">
+      <div class="manual-sub" id="sqlSubCard">
+        <div class="sub-title" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#5b3aa0;margin-bottom:4px;"><span>&#128221; 文本内容</span><span style="display:flex;gap:4px;"><button class="sql-act-btn sql-expand-btn2">展开</button><button class="sql-act-btn sql-edit-btn2">保存</button><button class="sql-act-btn sql-copy-btn2">复制</button></span></div>
+        <div class="sql-block" id="sqlBlock"><textarea class="sql-editor" placeholder="粘贴文本内容"></textarea></div>
+      </div>
+      <div class="manual-sub" id="imageSubCard">
+        <div class="sub-title" style="font-size:12px;font-weight:600;color:#5b3aa0;margin-bottom:4px;">&#128247; 图片内容</div>
+        <div class="image-paste-area" id="imagePasteArea" tabindex="0" style="display:flex;align-items:center;justify-content:center;">
+          <div class="placeholder" id="imagePlaceholder" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">（ Ctrl+V 粘贴 / 拖拽 / 点击选择图片）</div>
+          <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none;">
+        </div>
+      </div>
+      <div class="manual-sub" id="attSubCard">
+        <div class="sub-title" style="font-size:12px;font-weight:600;color:#5b3aa0;margin-bottom:4px;">&#128206; 附件</div>
+        <div class="image-paste-area" id="attPasteArea" tabindex="0" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;" onclick="if(document.body.classList.contains('shared-mode'))return;if(attachments.length>=3){showToast('已达上传附件上限，可选择删除部分文件重新上传');return;}document.getElementById('attInput').click();">
+          <div class="placeholder" id="attPlaceholder">点击或拖拽上传（≤5MB，最多3个）</div>
+          <input type="file" id="attInput" accept=".xlsx,.xls,.csv,.json,.txt,.pdf,.doc,.docx,.md,.xml,.zip,.png,.jpg,.jpeg" multiple style="display:none;" onchange="var files=this.files;for(var i=0;i<files.length&&attachments.length<3;i++)addAttachment(files[i]);this.value='';">
+          <div id="attFileList" style="font-size:11px;color:#888;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+const $ = id => document.getElementById(id);
+var sourceHeaders = [], sourceData = [], sourceRaw = null, sourceFileName = '', sourceRawAll = null;
+var compareHeaders = [], compareData = [], compareRaw = null, compareFileName = '', compareRawAll = null;
+var sourceFileDataUrl = '', compareFileDataUrl = '';
+var compareKeyFields = [];
+var compareFields = [];
+var diffResults = [];
+var pageName = '';
+var imageDataUrls = [];
+var attachments = [];
+
+// Page title is kept in-memory only: the master file reverts to its default
+// title on refresh, while the edited title is carried into the shared page via
+// the exported DOM snapshot. No localStorage persistence is used here.
+function loadTitle() {
+  pageName = $('pageTitle').textContent;
+}
+function saveTitle() {
+  const txt = $('pageTitle').textContent.trim();
+  if (!txt) { $('pageTitle').textContent = pageName; return; }
+  pageName = txt;
+  document.title = pageName;
+}
+loadTitle();
+
+// DOM-dependent initialization
+function initDom() {
+// Image paste (upload disabled in shared mode; clicking a thumb still enlarges)
+$('imagePasteArea').addEventListener('click', function(){ if (document.body.classList.contains('shared-mode')) return; $('imagePasteArea').focus(); $('imageFileInput').click(); });
+$('imagePasteArea').addEventListener('paste', e => {
+  if (document.body.classList.contains('shared-mode')) return;
+  const items = (e.clipboardData || window.clipboardData).items;
+  for (let i=0; i<items.length; i++) { if (items[i].type.indexOf('image')!==-1) { addImage(items[i].getAsFile()); e.preventDefault(); return; } }
+});
+$('imagePasteArea').addEventListener('dragover', e => { if (document.body.classList.contains('shared-mode')) return; e.preventDefault(); });
+$('imagePasteArea').addEventListener('drop', e => { if (document.body.classList.contains('shared-mode')) return; e.preventDefault(); [...e.dataTransfer.files].forEach(f => { if(f.type.startsWith('image/')) addImage(f); }); });
+$('imageFileInput').addEventListener('change', e => { if (document.body.classList.contains('shared-mode')) return; [...e.target.files].forEach(f => addImage(f)); e.target.value=''; });
+
+
+// SQL block: expand / edit / copy
+let sqlExpanded = false, sqlEditing = false;
+
+// SQL block: expand / edit / copy
+
+// Auto-resize textarea on input
+document.addEventListener('input', function(e) {
+  if (e.target.classList.contains('sql-editor')) {
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(200, Math.max(80, e.target.scrollHeight)) + 'px';
+  }
+});
+
+// Attachment upload
+$('attPasteArea').addEventListener('click', function(){ if (document.body.classList.contains('shared-mode')) return; if (attachments.length >= 3) { showToast('已达上传附件上限，可选择删除部分文件重新上传'); return; } $('attInput').click(); });
+$('attPasteArea').addEventListener('dragover', function(e){ if (document.body.classList.contains('shared-mode')) return; e.preventDefault(); this.style.borderColor = '#8b5cf6'; });
+$('attPasteArea').addEventListener('dragleave', function(){ if (document.body.classList.contains('shared-mode')) return; this.style.borderColor = '#e9defb'; });
+$('attPasteArea').addEventListener('drop', function(e){ if (document.body.classList.contains('shared-mode')) return; e.preventDefault(); this.style.borderColor = '#e9defb'; var files = e.dataTransfer.files; for (var i=0; i<files.length && (attachments.length+(attachments._pending||0))<3; i++) addAttachment(files[i]); });
+$('attInput').addEventListener('change', function(e){ [...e.target.files].forEach(function(f){ addAttachment(f); }); e.target.value = ''; });
+}
+initDom();
+
+function openLightbox(src) {
+  const overlay = document.createElement('div'); overlay.className = 'image-lightbox';
+  overlay.innerHTML = '<img src="'+src+'" alt="放大查看">';
+  overlay.addEventListener('click', function(){ overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+function renderImages() {
+  var ph = $('imagePlaceholder'); if (ph) ph.remove();
+  $('imagePasteArea').querySelectorAll('.image-thumb').forEach(function(el){ el.remove(); });
+  imageDataUrls.forEach(function(src, idx){
+    var div = document.createElement('div'); div.className = 'image-thumb';
+    div.innerHTML = '<img src=\"'+src+'\" alt=\"截图'+(idx+1)+'\"><button class=\"rm-btn\" data-idx=\"'+idx+'\">&times;</button>';
+    div.querySelector('img').addEventListener('click', function(e){ e.stopPropagation(); openLightbox(src); });
+    $('imagePasteArea').appendChild(div);
+  });
+  $('imagePasteArea').querySelectorAll('.rm-btn').forEach(function(btn){
+    btn.addEventListener('click', function(e){ e.stopPropagation(); imageDataUrls.splice(+btn.dataset.idx,1); renderImages(); });
+  });
+  if (imageDataUrls.length === 0) {
+    $('imagePasteArea').innerHTML = '<div class=\"placeholder\" id=\"imagePlaceholder\" style=\"display:flex;align-items:center;justify-content:center;width:100%;height:100%;\">（ Ctrl+V 粘贴 / 拖拽 / 点击选择图片）</div><input type=\"file\" id=\"imageFileInput\" accept=\"image/*\" multiple style=\"display:none;\">';
+    $('imagePasteArea').style.display = 'flex';
+    $('imagePasteArea').style.alignItems = 'center';
+    $('imagePasteArea').style.justifyContent = 'center';
+    $('imageFileInput').addEventListener('change', function(e){ [...e.target.files].forEach(function(f){ addImage(f); }); e.target.value = ''; });
+  }
+}
+function addImage(file) {
+  var reader = new FileReader();
+  reader.onload = function(ev){ imageDataUrls.push(ev.target.result); renderImages(); };
+  reader.readAsDataURL(file);
+}
+
+// SQL block buttons
+function initSqlBtns() {
+  document.querySelectorAll('.sql-edit-btn2').forEach(function(eb){
+    if (eb._wired) return; eb._wired = true;
+    eb.onclick = function(){
+      var block = this.closest('.manual-sub').querySelector('.sql-block');
+      if (!block) return;
+      if (block.querySelector('.sql-editor')) {
+        var ed = block.querySelector('.sql-editor');
+        block.innerHTML = '<div class="sql-content" style="flex:1;white-space:pre-wrap;word-break:break-all;padding:8px;color:#333;text-align:left;">' + esc(ed.value.trim() || '') + '</div>';
+        this.textContent = '编辑';
+      } else {
+        var c = block.querySelector('.sql-content');
+        var txt = c ? c.textContent.trim() : '';
+        block.innerHTML = '<textarea class="sql-editor" placeholder="粘贴文本内容"></textarea>';
+        if (txt) block.querySelector('.sql-editor').value = txt;
+        this.textContent = '保存';
+      }
+    };
+  });
+  document.querySelectorAll('.sql-expand-btn2').forEach(function(xb){
+    if (xb._wired) return; xb._wired = true;
+    xb.onclick = function(e){
+      e.stopPropagation();
+      var block = this.closest('.manual-sub').querySelector('.sql-block');
+      if (!block) return;
+      var expanded = block.classList.toggle('expanded');
+      block.style.maxHeight = expanded ? 'none' : '200px';
+      this.textContent = expanded ? '收起' : '展开';
+    };
+  });
+  document.querySelectorAll('.sql-copy-btn2').forEach(function(cb){
+    if (cb._wired) return; cb._wired = true;
+    cb.onclick = function(){
+      var block = this.closest('.manual-sub').querySelector('.sql-block');
+      if (!block) return;
+      var ed = block.querySelector('.sql-editor');
+      var txt = ed ? ed.value.trim() : '';
+      if (!txt) { var c = block.querySelector('.sql-content'); txt = c ? c.textContent.trim() : ''; }
+      if (!txt) { showToast('无内容可复制'); return; }
+      navigator.clipboard.writeText(txt).then(function(){ showToast('已复制'); });
+    };
+  });
+}
+initSqlBtns();
+
+function getSqlText() {
+  var b = document.querySelector('.sql-block');
+  if (!b) return '';
+  var ed = b.querySelector('.sql-editor');
+  if (ed) return ed.value.trim();
+  var c = b.querySelector('.sql-content');
+  if (c) return c.textContent.trim();
+  return '';
+}
+function setSqlText(txt) {
+  var b = document.querySelector('.sql-block');
+  if (!b) return;
+  b.innerHTML = '<div class="sql-content" style="flex:1;white-space:pre-wrap;word-break:break-all;padding:8px;color:#333;text-align:left;">' + esc(txt || '') + '</div>';
+  var eb = document.querySelector('.sql-edit-btn2');
+  if (eb) eb.textContent = '编辑';
+}
+function copySQL() {
+  var b = document.querySelector('.sql-block');
+  if (!b) return;
+  var ed = b.querySelector('.sql-editor');
+  var txt = ed ? ed.value.trim() : '';
+  if (!txt) { var c = b.querySelector('.sql-content'); txt = c ? c.textContent.trim() : ''; }
+  if (!txt) { showToast('无内容可复制'); return; }
+  navigator.clipboard.writeText(txt).then(function(){ showToast('已复制'); });
+}
+
+
+function addAttachment(file) {
+  if (file.size > 5 * 1024 * 1024) { showToast('附件 \"'+file.name+'\" 超过5MB限制'); return; }
+  var idx = attachments.length + (attachments._pending || 0);
+  if (idx >= 3) { showToast('已达上传附件上限，可选择删除部分文件重新上传'); return; }
+  attachments._pending = (attachments._pending || 0) + 1;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    attachments.push({ name: file.name, size: file.size, type: file.type, dataUrl: ev.target.result, time: new Date().toLocaleString() });
+    attachments._pending = (attachments._pending || 1) - 1;
+    renderAttachments();
+  };
+  reader.onerror = function(){ attachments._pending = (attachments._pending || 1) - 1; };
+  reader.readAsDataURL(file);
+}
+
+function renderAttachments() {
+  var ph = $('attPlaceholder'); if (ph) ph.style.display = attachments.length > 0 ? 'none' : '';
+  var list = $('attFileList');
+  if (attachments.length === 0) { list.innerHTML = ''; return; }
+  list.innerHTML = attachments.map(function(a, i){
+    return '<div onclick=\"event.stopPropagation()\" style=\"display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f8fafd;border:1px solid #e8f0fe;border-radius:4px;margin-bottom:6px;\">'+
+      '<span style=\"flex:1;font-size:12px;color:#333;cursor:pointer;\" title=\"点击修改文件名\" onclick=\"event.stopPropagation();renameAttachment('+i+')\" id=\"attName'+i+'\">'+esc(a.name)+'</span>'+
+      '<span style=\"font-size:10px;color:#999;white-space:nowrap;\">'+(a.size/1024).toFixed(1)+' KB</span>'+
+      '<span style=\"font-size:10px;color:#999;white-space:nowrap;\">'+a.time+'</span>'+
+      '<a class=\"att-dl\" href=\"'+a.dataUrl+'\" download=\"'+esc(a.name)+'\" target=\"_blank\" onclick=\"event.stopPropagation()\" style=\"font-size:11px;color:#4f8ef7;text-decoration:underline;white-space:nowrap;\">下载</a>'+
+      '<a href=\"javascript:void(0)\" onclick=\"event.stopPropagation();removeAttachment('+i+')\" style=\"font-size:11px;color:#c5221f;text-decoration:underline;white-space:nowrap;\">删除</a>'+
+      '</div>';
+  }).join('');
+}
+
+function renameAttachment(i) {
+  var span = $('attName'+i);
+  var oldName = attachments[i].name;
+  var input = document.createElement('input');
+  input.type = 'text'; input.value = oldName;
+  input.style.cssText = 'font-size:12px;padding:2px 4px;border:1px solid #4f8ef7;border-radius:2px;width:100%;';
+  input.onblur = function(){
+    var newName = this.value.trim() || oldName;
+    attachments[i].name = newName;
+    // Update download link
+    var dl = this.parentElement.parentElement.querySelector('.att-dl');
+    if (dl) dl.setAttribute('download', newName);
+    span.textContent = newName; span.style.display = '';
+    this.remove();
+  };
+  input.onkeydown = function(e){ if(e.key==='Enter') this.blur(); };
+  span.style.display = 'none';
+  span.parentElement.insertBefore(input, span);
+  input.focus(); input.select();
+}
+
+function removeAttachment(i) { attachments.splice(i,1); renderAttachments(); }
+
+function downloadAttachment(i) {
+  var a = attachments[i];
+  if (!a || !a.dataUrl) return;
+  // Try direct data URL download first
+  var link = document.createElement('a');
+  link.href = a.dataUrl;
+  link.download = a.name;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+var compareCount = 0, noteCount = 0;
+
+function toggleCompare() {
+  var clones = document.querySelectorAll('[id^="uploadSection_clone"]');
+  if (clones.length > 0 && !diffResults.length) { showToast('请先完成当前数据核对后再添加新的对比'); return; }
+  compareCount++;
+  var clone = $('uploadSection').cloneNode(true);
+  clone.id = 'uploadSection_clone'+compareCount;
+  clone.style.display = 'block';
+  // Set unique tab name
+  var tab = clone.querySelector('.compare-tab');
+  if (tab) tab.textContent = '数据对比'+compareCount;
+  clone.querySelectorAll('input[type=file]').forEach(function(inp){ inp.value=''; });
+  clone.querySelectorAll('.file-info').forEach(function(el){ el.innerHTML=''; el.classList.remove('show'); });
+  clone.querySelectorAll('.preview-box').forEach(function(el){ el.classList.remove('has-data'); });
+  clone.querySelectorAll('.preview-wrap').forEach(function(el){ el.style.display='none'; });
+  clone.querySelectorAll('.preview-table').forEach(function(el){ el.innerHTML=''; });
+  clone.querySelectorAll('.preview-placeholder').forEach(function(el){ el.style.display=''; });
+  clone.querySelectorAll('.workflow-step').forEach(function(el){ el.classList.remove('done','active'); });
+  // Re-wire upload listeners for cloned cards
+  var srcCard = clone.querySelector('#uploadCard');
+  var srcInput = clone.querySelector('#fileInput');
+  var cmpCard = clone.querySelector('#uploadCardCompare');
+  var cmpInput = clone.querySelector('#fileInputCompare');
+  if (srcCard && srcInput) setupUpload(srcCard, srcInput, null, processSourceFile);
+  if (cmpCard && cmpInput) setupUpload(cmpCard, cmpInput, null, processCompareFile);
+  var h2 = clone.querySelector('h2');
+  if (h2) {
+    var del = document.createElement('span');
+    del.textContent = '删除';
+    del.style.cssText = 'font-size:12px;color:#c5221f;cursor:pointer;font-weight:400;margin-left:12px;';
+    del.onclick = function(){ clone.remove(); };
+    h2.appendChild(del);
+  }
+  document.getElementById('container').appendChild(clone);
+}
+
+function toggleNote() {
+  // Only check cloned note sections (not the hidden original)
+  var clones = document.querySelectorAll('[id^="noteSection_clone"]');
+  if (clones.length > 0) {
+    // Check the last cloned section
+    var lastClone = clones[clones.length - 1];
+    var ta = lastClone.querySelector('textarea.sql-editor');
+    if (ta && !ta.value.trim()) {
+      showToast('请先在当前备注区域填写内容后再添加新的备注');
+      return;
+    }
+  }
+  noteCount++;
+  var clone = $('noteSection').cloneNode(true);
+  clone.id = 'noteSection_clone'+noteCount;
+  clone.style.display = 'block';
+  var ta = clone.querySelector('textarea.sql-editor');
+  if (ta) ta.value = '';
+  clone.querySelectorAll('.image-thumb').forEach(function(el){ el.remove(); });
+  var ph = clone.querySelector('.image-paste-area');
+  if (ph) { var plc = ph.querySelector('.placeholder'); if (plc) plc.style.display = ''; }
+  var h2 = clone.querySelector('h2');
+  if (h2) {
+    var del = document.createElement('span');
+    del.textContent = '删除';
+    del.style.cssText = 'font-size:12px;color:#c5221f;cursor:pointer;font-weight:400;margin-left:12px;';
+    del.onclick = function(){ clone.remove(); };
+    h2.appendChild(del);
+  }
+  document.getElementById('container').appendChild(clone);
+}
+
+// Upload setup
+setupUpload($('uploadCard'), $('fileInput'), $('fileInfo'), processSourceFile);
+setupUpload($('uploadCardCompare'), $('fileInputCompare'), $('fileInfoCompare'), processCompareFile);
+
+function setupUpload(card, input, info, handler) {
+  card.addEventListener('dragover', e => { if (document.body.classList.contains('shared-mode')) return; e.preventDefault(); card.classList.add('dragover'); });
+  card.addEventListener('dragleave', () => { if (document.body.classList.contains('shared-mode')) return; card.classList.remove('dragover'); });
+  card.addEventListener('drop', e => { if (document.body.classList.contains('shared-mode')) return; e.preventDefault(); card.classList.remove('dragover'); if (e.dataTransfer.files[0]) handler(e.dataTransfer.files[0]); });
+  input.addEventListener('change', e => { if (document.body.classList.contains('shared-mode')) return; if (e.target.files[0]) handler(e.target.files[0]); });
+}
+
+// Process source file
+function processSourceFile(file) {
+  sourceFileName = file.name;
+  showFileInfo($('fileInfo'), file, 'source');
+  $('fileInfo').classList.add('show');
+  sourceRawAll = { all: null };
+  var fr = new FileReader();
+  fr.onload = function(ev){ sourceFileDataUrl = ev.target.result; };
+  fr.readAsDataURL(file);
+  readExcel(file, (json, all) => {
+    sourceHeaders = all[0] || [];
+    sourceData = json;
+    sourceRaw = all;
+    compareKeyFields = [];
+    compareFields = [];
+    diffResults = [];
+    renderPreview(all, $('previewSection'), $('previewInfo'), $('previewTable'));
+    buildKeyConfig();
+    resetStepsAfter(1);
+  }, sourceRawAll, 'source');
+}
+
+// Process compare file
+function processCompareFile(file) {
+  compareFileName = file.name;
+  showFileInfo($('fileInfoCompare'), file, 'compare');
+  $('fileInfoCompare').classList.add('show');
+  compareRawAll = { all: null };
+  var fr = new FileReader();
+  fr.onload = function(ev){ compareFileDataUrl = ev.target.result; };
+  fr.readAsDataURL(file);
+  readExcel(file, (json, all) => {
+    compareHeaders = all[0] || [];
+    compareData = json;
+    compareRaw = all;
+    compareKeyFields = [];
+    compareFields = [];
+    diffResults = [];
+    renderPreview(all, $('previewSectionCompare'), $('previewInfoCompare'), $('previewTableCompare'));
+    buildKeyConfig();
+    resetStepsAfter(2);
+  }, compareRawAll, 'compare');
+}
+
+function restoreFileLink(type) {
+  var fn = type === 'source' ? sourceFileName : compareFileName;
+  var dataUrl = type === 'source' ? sourceFileDataUrl : compareFileDataUrl;
+  var el = type === 'source' ? $('fileInfo') : $('fileInfoCompare');
+  if (!fn || !dataUrl || !el) return;
+  el.innerHTML = '&#128196; <a href=\"'+dataUrl+'\" download=\"'+esc(fn)+'\" style=\"color:#1967d2;text-decoration:underline;position:relative;z-index:10;\" onclick=\"event.stopPropagation();\">'+esc(fn)+'</a>';
+  el.classList.add('show');
+}
+
+function showFileInfo(el, file, type) {
+  const url = URL.createObjectURL(file);
+  el.innerHTML = '&#128196; <a href="'+url+'" download="'+esc(file.name)+'" style="color:#1967d2;text-decoration:underline;position:relative;z-index:10;" onclick="event.stopPropagation();">'+esc(file.name)+'</a> <span style="color:#888;">('+(file.size/1024).toFixed(1)+' KB)</span> <a href="javascript:void(0)" onclick="event.stopPropagation();clearFile(\''+type+'\')" style="margin-left:8px;color:#c5221f;text-decoration:underline;position:relative;z-index:10;font-size:11px;">删除</a>';
+}
+
+function clearFile(type) {
+  if (type === 'source') {
+    sourceHeaders = []; sourceData = []; sourceRaw = null; sourceRawAll = null; sourceFileName = '';
+    $('fileInfo').innerHTML = ''; $('fileInfo').classList.remove('show');
+    $('fileInput').value = '';
+    var prevSection = $('previewSection'); prevSection.classList.remove('has-data');
+    $('previewInfo').style.display = 'none';
+    var wrap = $('previewSection').querySelector('.preview-wrap'); wrap.style.display = 'none';
+    $('previewTable').innerHTML = '';
+    $('previewSection').querySelector('.preview-placeholder').style.display = '';
+  } else {
+    compareHeaders = []; compareData = []; compareRaw = null; compareRawAll = null; compareFileName = '';
+    $('fileInfoCompare').innerHTML = ''; $('fileInfoCompare').classList.remove('show');
+    $('fileInputCompare').value = '';
+    var prevSection = $('previewSectionCompare'); prevSection.classList.remove('has-data');
+    $('previewInfoCompare').style.display = 'none';
+    var wrap = $('previewSectionCompare').querySelector('.preview-wrap'); wrap.style.display = 'none';
+    $('previewTableCompare').innerHTML = '';
+    $('previewSectionCompare').querySelector('.preview-placeholder').style.display = '';
+  }
+  // Reset config and results (wf3+), keep wf1/wf2 if other file still loaded
+  compareKeyFields = []; compareFields = []; diffResults = [];
+  buildKeyConfig();
+  var diffEl = $('diffSection'); if (diffEl) diffEl.style.display = 'none';
+  for (var i = 3; i <= 6; i++) { var s = $('wf' + i); if (s) s.classList.remove('done', 'active'); }
+  updateKeyDisplay();
+  showToast('已删除文件');
+}
+
+function readExcel(file, cb, storeRaw, type) {
+  const r = new FileReader();
+  r.onload = e => {
+    const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+    const s = wb.Sheets[wb.SheetNames[0]];
+    const all = XLSX.utils.sheet_to_json(s, {header:1});
+    if (storeRaw) storeRaw.all = all;
+    const parsed = parseData(all, type);
+    cb(parsed.json, parsed.preview);
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function reprocessFiles() {
+  if (sourceRawAll) {
+    const parsed = parseData(sourceRawAll.all, 'source');
+    sourceHeaders = parsed.preview[0] || []; sourceData = parsed.json; sourceRaw = parsed.preview;
+    renderPreview(sourceRaw, $('previewSection'), $('previewInfo'), $('previewTable'));
+  }
+  if (compareRawAll) {
+    const parsed = parseData(compareRawAll.all, 'compare');
+    compareHeaders = parsed.preview[0] || []; compareData = parsed.json; compareRaw = parsed.preview;
+    renderPreview(compareRaw, $('previewSectionCompare'), $('previewInfoCompare'), $('previewTableCompare'));
+  }
+  compareKeyFields = []; compareFields = [];
+  buildKeyConfig();
+  $('diffSection').style.display = 'none';
+  updateKeyDisplay();
+}
+
+function parseData(allData, type) {
+  const prefix = type === 'source' ? 'src' : 'cmp';
+  const headerIdx = Math.max(0, parseInt($(prefix + 'HeaderRow').value || 1) - 1);
+  const colStart = Math.max(0, parseInt($(prefix + 'DataStartCol').value || 1) - 1);
+  if (!allData || allData.length <= headerIdx) return { json: [], preview: [[]] };
+  // Extract headers from specified row, starting at specified column
+  const rawHeaders = allData[headerIdx] || [];
+  const headers = rawHeaders.slice(colStart).map(h => String(h ?? '').trim());
+  // Build data rows: skip rows before headerIdx+1, take columns from colStart
+  const dataRows = [];
+  for (let i = headerIdx + 1; i < allData.length; i++) {
+    const row = allData[i];
+    if (!row || row.every(c => c == null || String(c).trim() === '')) continue;
+    const obj = {};
+    headers.forEach((h, ci) => { obj[h] = row[colStart + ci] ?? ''; });
+    dataRows.push(obj);
+  }
+  // Build preview array (header row + data as arrays)
+  const preview = [headers];
+  dataRows.forEach(r => { preview.push(headers.map(h => r[h])); });
+  return { json: dataRows, preview };
+}
+
+function reprocessFiles() {
+  if (sourceRawAll) {
+    const parsed = parseData(sourceRawAll.all);
+    sourceHeaders = parsed.preview[0] || []; sourceData = parsed.json; sourceRaw = parsed.preview;
+    renderPreview(sourceRaw, $('previewSection'), $('previewInfo'), $('previewTable'));
+  }
+  if (compareRawAll) {
+    const parsed = parseData(compareRawAll.all);
+    compareHeaders = parsed.preview[0] || []; compareData = parsed.json; compareRaw = parsed.preview;
+    renderPreview(compareRaw, $('previewSectionCompare'), $('previewInfoCompare'), $('previewTableCompare'));
+  }
+  compareKeyFields = []; compareFields = [];
+  buildKeyConfig();
+  $('diffSection').style.display = 'none';
+  updateKeyDisplay();
+}
+
+function renderPreview(allData, section, info, table, fsMode) {
+  section.classList.add('has-data');
+  info.style.display = '';
+  table.closest('.preview-wrap').style.display = '';
+  const totalRows = allData.length - 1;
+  const max = fsMode ? Math.min(allData.length, 201) : Math.min(allData.length, 6);
+  info.textContent = '共 '+totalRows+' 条，预览前 '+(max-1)+' 条';
+  const headers = allData[0]||[];
+  let h = '<thead><tr>'; headers.forEach(x => h+='<th>'+esc(String(x))+'<span class="col-resizer"></span></th>'); h+='</tr></thead><tbody>';
+  for (let i=1; i<max; i++) { h+='<tr>'; headers.forEach((_,ci)=>{const v=allData[i]&&allData[i][ci]!=null?String(allData[i][ci]):'';h+='<td>'+esc(v)+'</td>';}); h+='</tr>'; }
+  h+='</tbody>'; table.innerHTML=h;
+  initColResize(table);
+  // Store full data for pagination
+  table._fullData = allData;
+  table._page = 0;
+  table._pageSize = 200;
+}
+
+function renderPage(table, page) {
+  const allData = table._fullData;
+  if (!allData) return;
+  const totalRows = allData.length - 1;
+  const pageSize = table._pageSize;
+  const totalPages = Math.ceil(totalRows / pageSize);
+  const start = page * pageSize + 1;
+  const end = Math.min(start + pageSize, allData.length);
+  const headers = allData[0]||[];
+  let h = '<thead><tr>'; headers.forEach(x => h+='<th>'+esc(String(x))+'<span class="col-resizer"></span></th>'); h+='</tr></thead><tbody>';
+  for (let i=start; i<end; i++) { h+='<tr>'; headers.forEach((_,ci)=>{const v=allData[i]&&allData[i][ci]!=null?String(allData[i][ci]):'';h+='<td>'+esc(v)+'</td>';}); h+='</tr>'; }
+  h+='</tbody>'; table.innerHTML=h;
+  table._page = page;
+  return { page, totalPages, start: start-1, end: end-2 };
+}
+
+function initColResize(table) {
+  requestAnimationFrame(() => {
+    const ths = table.querySelectorAll('th');
+    if (!ths.length || ths[0].offsetWidth===0) return;
+    // Keep auto layout for preview tables, freeze for fullscreen
+    if (table.closest('.preview-fullscreen')) {
+      const widths = []; ths.forEach(th => widths.push(th.offsetWidth));
+      const totalW = widths.reduce((a,b)=>a+b,0);
+      table.style.tableLayout = 'fixed';
+      table.style.width = totalW + 'px';
+      ths.forEach((th, i) => { th.style.width = widths[i] + 'px'; });
+    }
+    // Add col-resizers if missing
+    ths.forEach(th => {
+      if (!th.querySelector('.col-resizer')) {
+        const resizer = document.createElement('span');
+        resizer.className = 'col-resizer';
+        th.appendChild(resizer);
+      }
+    });
+    // Wire resize
+    ths.forEach(th => {
+      const resizer = th.querySelector('.col-resizer');
+      if (!resizer || resizer._wired) return;
+      resizer._wired = true;
+      let startX,startW,startTableW;
+      resizer.addEventListener('mousedown', e=>{
+        e.preventDefault(); e.stopPropagation();
+        startX=e.pageX; startW=th.offsetWidth;
+        // Switch to fixed layout on first resize
+        if (table.style.tableLayout !== 'fixed') {
+          const allThs = table.querySelectorAll('th');
+          const ws = []; allThs.forEach(t => ws.push(t.offsetWidth));
+          table.style.tableLayout = 'fixed';
+          table.style.width = ws.reduce((a,b)=>a+b,0) + 'px';
+          allThs.forEach((t, i) => { t.style.width = ws[i] + 'px'; });
+        }
+        startTableW=table.offsetWidth;
+        resizer.classList.add('active'); document.body.style.cursor='col-resize'; document.body.style.userSelect='none';
+        const onMove=ev=>{const delta=ev.pageX-startX; const nw=Math.max(30,startW+delta); th.style.width=nw+'px'; table.style.width=(startTableW+(nw-startW))+'px';};
+        const onUp=()=>{resizer.classList.remove('active');document.body.style.cursor='';document.body.style.userSelect='';document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);};
+        document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
+      });
+    });
+  });
+}
+
+// Build unique key dropdown and comparison field dropdown from source headers
+function buildKeyConfig() {
+  const allHeaders = [...new Set([...sourceHeaders, ...compareHeaders])];
+  if (!allHeaders.length) return;
+  $('keyConfigSection').style.display = 'block';
+
+  // Build key dropdown
+  const keyMenu = $('keyDropdownMenu');
+  keyMenu.innerHTML = allHeaders.map(h =>
+    '<div class="key-dropdown-item '+ (compareKeyFields.includes(h) ? 'selected' : '') +'" onclick="toggleSelect(this,\''+escAttr(h)+'\',\'key\')"><span class="check-icon">&#10004;</span> '+esc(h)+'</div>'
+  ).join('');
+  renderTags('keyDropdown', compareKeyFields, 'keyPlaceholder', 'key');
+
+  // Build comparison field dropdown (only from source headers, excluding key fields)
+  const srcHeaders = sourceHeaders.filter(h => !compareKeyFields.includes(h));
+  const fieldMenu = $('fieldDropdownMenu');
+  fieldMenu.innerHTML = srcHeaders.map(h =>
+    '<div class="key-dropdown-item '+ (compareFields.includes(h) ? 'selected' : '') +'" onclick="toggleSelect(this,\''+escAttr(h)+'\',\'field\')"><span class="check-icon">&#10004;</span> '+esc(h)+'</div>'
+  ).join('');
+  renderTags('fieldDropdown', compareFields, 'fieldPlaceholder', 'field');
+
+  updateKeyDisplay();
+}
+
+function toggleSelect(el, field, type) {
+  const arr = type === 'key' ? compareKeyFields : compareFields;
+  const ddId = type === 'key' ? 'keyDropdown' : 'fieldDropdown';
+  const placeholderId = type === 'key' ? 'keyPlaceholder' : 'fieldPlaceholder';
+
+  if (arr.includes(field)) {
+    if (type === 'key') {
+      compareKeyFields = compareKeyFields.filter(f => f !== field);
+    } else {
+      compareFields = compareFields.filter(f => f !== field);
+    }
+    el.classList.remove('selected');
+  } else {
+    arr.push(field);
+    el.classList.add('selected');
+  }
+  renderTags(ddId, arr, placeholderId, type);
+
+  // If key fields changed, rebuild field dropdown to exclude new key fields
+  if (type === 'key') buildFieldDropdown();
+  updateKeyDisplay();
+}
+
+function renderTags(ddId, fields, placeholderId, type) {
+  const dd = $(ddId);
+  const trigger = dd.querySelector('.key-dropdown-trigger');
+  const placeholder = $(placeholderId);
+  trigger.querySelectorAll('.key-tag').forEach(t => t.remove());
+
+  if (fields.length === 0) {
+    placeholder.style.display = 'inline';
+  } else {
+    placeholder.style.display = 'none';
+    fields.forEach(f => {
+      const tag = document.createElement('span');
+      tag.className = 'key-tag';
+      tag.innerHTML = esc(f) + ' <span class="rm" onclick="event.stopPropagation();removeTag(\''+escAttr(f)+'\',\''+type+'\')">&times;</span>';
+      trigger.appendChild(tag);
+    });
+  }
+}
+
+function removeTag(field, type) {
+  if (type === 'key') {
+    compareKeyFields = compareKeyFields.filter(f => f !== field);
+    buildFieldDropdown();
+  } else {
+    compareFields = compareFields.filter(f => f !== field);
+  }
+  const ddId = type === 'key' ? 'keyDropdown' : 'fieldDropdown';
+  const placeholderId = type === 'key' ? 'keyPlaceholder' : 'fieldPlaceholder';
+  const arr = type === 'key' ? compareKeyFields : compareFields;
+  // Update menu item
+  const menuId = type === 'key' ? 'keyDropdownMenu' : 'fieldDropdownMenu';
+  $(menuId).querySelectorAll('.key-dropdown-item').forEach(item => {
+    if (item.textContent.trim().replace('✔ ','') === field) item.classList.remove('selected');
+  });
+  renderTags(ddId, arr, placeholderId, type);
+  updateKeyDisplay();
+}
+
+function buildFieldDropdown() {
+  const srcHeaders = sourceHeaders.filter(h => !compareKeyFields.includes(h));
+  const menu = $('fieldDropdownMenu');
+  menu.innerHTML = srcHeaders.map(h =>
+    '<div class="key-dropdown-item '+ (compareFields.includes(h) ? 'selected' : '') +'" onclick="toggleSelect(this,\''+escAttr(h)+'\',\'field\')"><span class="check-icon">&#10004;</span> '+esc(h)+'</div>'
+  ).join('');
+}
+
+function toggleDD(ddId) {
+  const dd = $(ddId);
+  const wasOpen = dd.classList.contains('open');
+  // Close all dropdowns first
+  ['keyDropdown', 'fieldDropdown'].forEach(id => { if ($(id)) $(id).classList.remove('open'); });
+  if (!wasOpen) dd.classList.add('open');
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+  ['keyDropdown', 'fieldDropdown'].forEach(id => {
+    const dd = $(id);
+    if (dd && !dd.contains(e.target)) dd.classList.remove('open');
+  });
+});
+
+function applyKeyAndCompare() {
+  ['keyDropdown', 'fieldDropdown'].forEach(id => { if ($(id)) $(id).classList.remove('open'); });
+  updateKeyDisplay();
+  if (compareKeyFields.length > 0) { markStepDone('wf3'); markStepDone('wf4'); }
+  tryCompare();
+  markStepDone('wf5'); markStepDone('wf6');
+}
+
+function markStepDone(id) {
+  var step = $(id);
+  if (step) { step.classList.remove('active'); step.classList.add('done'); }
+}
+
+function resetStepsAfter(n) {
+  // Mark steps 1..n as done
+  for (var i = 1; i <= n; i++) {
+    markStepDone('wf' + i);
+  }
+  // Reset steps from n+1 onwards
+  for (var i = n + 1; i <= 6; i++) {
+    var step = $('wf' + i);
+    if (step) { step.classList.remove('done', 'active'); }
+  }
+  // Hide diff section
+  if ($('diffSection')) $('diffSection').style.display = 'none';
+}
+
+function updateKeyDisplay() {
+  const hasKey = compareKeyFields.length > 0;
+  const bothUploaded = sourceData.length > 0 && compareData.length > 0;
+  const canCompare = hasKey && bothUploaded;
+
+  let msg = '';
+  if (!bothUploaded) {
+    msg = '（请先上传 A、B 两份数据文件）';
+  } else if (!hasKey) {
+    msg = '（请选择至少一个唯一键字段）';
+  } else {
+    msg = '唯一键: ' + compareKeyFields.map(f => esc(f)).join(' + ')
+        + (compareFields.length > 0 ? '  |  核对字段: ' + compareFields.length + ' 个' : '  |  核对字段: 全部同名字段');
+  }
+  $('keyDisplay').textContent = msg;
+  $('btnCompare').disabled = !canCompare;
+}
+
+// Normalize numeric values: strip trailing zeros
+function normalizeNum(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return s;
+  // Check if looks like a number (starts/ends with digit, may contain decimal point or minus)
+  if (/^-?\d/.test(s) && /\d$/.test(s) && /^-?[\d.,]+$/.test(s)) {
+    // Normalize: remove trailing zeros after decimal point
+    if (s.indexOf('.') !== -1 || s.indexOf(',') !== -1) {
+      // Replace comma with nothing (thousands separator) then parse
+      var normalized = s.replace(/,/g, '');
+      var num = parseFloat(normalized);
+      if (!isNaN(num)) {
+        // Convert back to string without unnecessary trailing zeros
+        return String(num);
+      }
+    }
+  }
+  return s;
+}
+
+// Build unique key string from a row
+function buildKey(row, headers) {
+  if (compareKeyFields.length === 0) return null;
+  return compareKeyFields.map(f => {
+    const idx = headers.indexOf(f);
+    return idx >= 0 ? String(row[headers[idx]] || '').trim() : '';
+  }).join('||');
+}
+
+// Main comparison logic
+function tryCompare() {
+  if (!sourceData.length || !compareData.length) return;
+  if (compareKeyFields.length === 0) return;
+
+  // Build index for compare data by unique key
+  const compareIndex = {};
+  compareData.forEach(row => {
+    const key = buildKey(row, compareHeaders);
+    if (key) compareIndex[key] = row;
+  });
+
+  // Get all non-key fields from both datasets; apply user filter if selected
+  const allHeaders = [...new Set([...sourceHeaders, ...compareHeaders])];
+  let commonFields = allHeaders.filter(f => !compareKeyFields.includes(f));
+  if (compareFields.length > 0) {
+    commonFields = commonFields.filter(f => compareFields.includes(f));
+  }
+  // Compute actual comparison fields (including A-only and B-only)
+  const allSrcFields = sourceHeaders.filter(f => !compareKeyFields.includes(f));
+  const allCmpFields = compareHeaders.filter(f => !compareKeyFields.includes(f));
+  const allCompareFields = [...new Set([...allSrcFields, ...allCmpFields])];
+  if (compareFields.length > 0) {
+    commonFields = allCompareFields.filter(f => compareFields.includes(f));
+  } else {
+    commonFields = allCompareFields;
+  }
+
+  diffResults = [];
+  let total = 0, matched = 0, mismatched = 0, skipped = 0;
+
+  sourceData.forEach((sRow, idx) => {
+    total++;
+    const key = buildKey(sRow, sourceHeaders);
+    if (!key) { skipped++; return; }
+    const cRow = compareIndex[key];
+    if (!cRow) {
+      // Key exists only in source
+      const diffs = commonFields.map(f => ({
+        field: f, sourceVal: (sRow[f] == null || String(sRow[f]).trim() === '') ? 'null' : String(sRow[f]).trim(), compareVal: compareHeaders.indexOf(f) === -1 ? '(被核对文件无此字段)' : '(被核对文件无此记录)', match: false
+      }));
+      diffResults.push({ key, diffs, allMatch: false });
+      mismatched++;
+      return;
+    }
+    // Compare using commonFields (determined from headers)
+    const diffs = commonFields.map(f => {
+      const inSrc = sourceHeaders.indexOf(f) !== -1 && sRow[f] != null && String(sRow[f]).trim() !== '';
+      const inCmp = compareHeaders.indexOf(f) !== -1 && cRow[f] != null && String(cRow[f]).trim() !== '';
+      var srcHasField = sourceHeaders.indexOf(f) !== -1;
+      var cmpHasField = compareHeaders.indexOf(f) !== -1;
+      if (srcHasField && !cmpHasField) {
+        var _v = sRow[f];
+        return { field: f, sourceVal: (_v == null || String(_v).trim() === '') ? 'null' : String(_v).trim(), compareVal: '(被核对文件无此字段)', match: false };
+      }
+      if (!srcHasField && cmpHasField) {
+        var _v2 = cRow[f];
+        return { field: f, sourceVal: '(参考标准文件无此字段)', compareVal: (_v2 == null || String(_v2).trim() === '') ? 'null' : String(_v2).trim(), match: false };
+      }
+      var svRaw = sRow[f], cvRaw = cRow[f];
+      var sv = (svRaw == null || String(svRaw).trim() === '') ? 'null' : String(svRaw).trim();
+      var cv = (cvRaw == null || String(cvRaw).trim() === '') ? 'null' : String(cvRaw).trim();
+      var svNorm = normalizeNum(svRaw), cvNorm = normalizeNum(cvRaw);
+      return { field: f, sourceVal: sv, compareVal: cv, match: svNorm === cvNorm };
+    });
+    const allMatch = diffs.every(d => d.match);
+    diffResults.push({ key, diffs, allMatch });
+    if (allMatch) matched++; else mismatched++;
+  });
+
+  // Check for keys only in compare data
+  const sourceKeys = new Set(sourceData.map(r => buildKey(r, sourceHeaders)).filter(Boolean));
+  compareData.forEach(cRow => {
+    const key = buildKey(cRow, compareHeaders);
+    if (key && !sourceKeys.has(key)) {
+      const diffs = commonFields.map(f => ({
+        field: f,
+        sourceVal: sourceHeaders.indexOf(f) === -1 ? '(参考标准文件无此字段)' : '(参考标准文件无此记录)',
+        compareVal: (cRow[f] == null || String(cRow[f] ?? '').trim() === '') ? 'null' : String(cRow[f]).trim(),
+        match: false
+      }));
+      diffResults.push({ key, diffs, allMatch: false });
+      total++; mismatched++;
+    }
+  });
+
+  renderDiff(commonFields, total, matched, mismatched, skipped);
+}
+
+function renderDiff(commonFields, total, matched, mismatched, skipped) {
+  var section = $('diffSection');
+  if (!section) return;
+  section.style.display = 'block';
+  if (!commonFields || commonFields.length === 0) {
+    $('diffStats').innerHTML = '<div class=\"stat-box stat-skip\">无对比字段</div>';
+    return;
+  }
+
+  // Stats
+  $('diffStats').innerHTML =
+    '<div class="stat-box" style="background:#e8f0fe;color:#1967d2;">核对总数: '+total+' 行</div>' +
+    '<div class="stat-box stat-match">&#10004; 一致: '+matched+' 行</div>' +
+    '<div class="stat-box stat-mismatch">&#10008; 有差异: '+mismatched+' 行</div>' +
+    '<div class="stat-box stat-skip">跳过: '+skipped+' 行</div>';
+
+  // Summary text removed
+
+  // Table headers with filter buttons
+  const colSpan = 1 + compareKeyFields.length + commonFields.length + 1;
+  let headHtml = '<tr><th>序号</th>';
+  compareKeyFields.forEach(f => headHtml += '<th style="position:relative;">'+esc(f)+'（键）<span class="col-filter-btn" onclick="toggleColFilter(event,\''+escAttr(f)+'\')" title="按此字段筛选"><svg width="14" height="14" viewBox="0 0 12 12" style="vertical-align:middle"><polygon points="1,1 11,1 7,6 7,11 5,9 5,6" fill="none" stroke="#fff" stroke-width="2"/></svg></span><span class="col-filter-popup" id="filter_'+escAttr(f)+'"><input placeholder="筛选 '+escAttr(f)+'..." oninput="applyColFilter(\''+escAttr(f)+'\',this.value)"><button class="clear-btn" onclick="clearColFilter(\''+escAttr(f)+'\')">&times;</button></span></th>');
+  commonFields.forEach(f => headHtml += '<th style="text-align:center;position:relative;">'+esc(f)+'<br><small style="font-weight:400;">A &nbsp;|&nbsp; B</small><span class="col-filter-btn" onclick="toggleColFilter(event,\''+escAttr(f)+'\')" title="按此字段筛选"><svg width="14" height="14" viewBox="0 0 12 12" style="vertical-align:middle"><polygon points="1,1 11,1 7,6 7,11 5,9 5,6" fill="none" stroke="#fff" stroke-width="2"/></svg></span><span class="col-filter-popup" id="filter_'+escAttr(f)+'"><input placeholder="筛选 '+escAttr(f)+'..." oninput="applyColFilter(\''+escAttr(f)+'\',this.value)"><button class="clear-btn" onclick="clearColFilter(\''+escAttr(f)+'\')">&times;</button></span></th>');
+  headHtml += '<th style="text-align:center;">判定</th></tr>';
+  $('diffHead').innerHTML = headHtml;
+
+  // Body - show first page (200 rows), rest via scroll
+  var bodyHtml = '';
+  var pageSize = 200;
+  var initialCount = Math.min(pageSize, diffResults.length);
+  if (diffResults.length === 0) {
+    bodyHtml = '<tr><td colspan=\"'+colSpan+'\" style=\"text-align:center;color:#888;padding:20px;\">无差异数据或核对未执行</td></tr>';
+  } else {
+    try {
+      for (var idx = 0; idx < initialCount; idx++) {
+        var r = diffResults[idx];
+        var keyParts = (r.key || '').split('||');
+        bodyHtml += '<tr class=\"diff-row\">';
+        bodyHtml += '<td class=\"num\">'+(idx+1)+'</td>';
+        keyParts.forEach(function(kp, ki){ bodyHtml += '<td class=\"diff-cell\" data-field=\"'+escAttr(compareKeyFields[ki]||'')+'\" data-val=\"'+escAttr(kp)+'\">'+esc(kp)+'</td>'; });
+        (r.diffs || []).forEach(function(d){
+          var sv = String(d.sourceVal || ''); var cv = String(d.compareVal || '');
+          var isNullA = sv === 'null';
+          var isOnlyA = sv.indexOf('无此记录')!==-1;
+          var isFieldOnlyA = sv.indexOf('无此字段')!==-1;
+          var isRefFieldOnlyA = sv.indexOf('参考标准文件无此字段')!==-1;
+          var isNullB = cv === 'null';
+          var isOnlyB = cv.indexOf('无此记录')!==-1;
+          var isFieldOnlyB = cv.indexOf('无此字段')!==-1;
+          var aStyle = isNullA ? 'diff-missing' : (isOnlyA ? 'diff-only' : (isRefFieldOnlyA ? 'diff-match' : (isFieldOnlyA ? 'diff-only' : 'diff-match')));
+          var bStyle = d.match ? 'diff-match' : (isNullB ? 'diff-missing' : (isOnlyB ? 'diff-only' : (isFieldOnlyB ? 'diff-only' : 'diff-mismatch')));
+          bodyHtml += '<td class=\"num diff-cell\" data-field=\"'+escAttr(d.field)+'\" data-val=\"'+escAttr(sv+cv)+'\"><span class=\"'+aStyle+'\">'+esc(sv)+'</span><br><span class=\"'+bStyle+'\">'+esc(cv)+'</span></td>';
+        });
+        bodyHtml += '<td class=\"num\">'+(r.allMatch ? '&#10004;' : '&#10008;')+'</td>';
+        bodyHtml += '</tr>';
+      }
+    } catch(e) {
+      bodyHtml = '<tr><td colspan=\"'+colSpan+'\" style=\"text-align:center;color:#c5221f;padding:20px;\">渲染出错: '+esc(e.message)+'</td></tr>';
+    }
+  }
+  if (!bodyHtml) bodyHtml = '<tr><td colspan=\"'+colSpan+'\" style=\"text-align:center;color:#888;padding:20px;\">暂无核对数据</td></tr>';
+
+  var db = $('diffBody');
+  if (db) {
+    db.innerHTML = bodyHtml;
+    // Setup infinite scroll for large results
+    db._allRows = diffResults;
+    db._pageSize = 200;
+    db._loadedCount = Math.min(200, diffResults.length);
+    db._commonFields = commonFields;
+    db._compareKeyFields = compareKeyFields;
+    if (diffResults.length > 200) {
+      // Add sentinel for scroll detection
+      var sentinel = document.createElement('tr');
+      sentinel.id = 'scrollSentinel';
+      sentinel.innerHTML = '<td colspan=\"'+colSpan+'\" style=\"text-align:center;color:#888;padding:8px;\">向下滚动加载更多...</td>';
+      db.appendChild(sentinel);
+      setupInfiniteScroll();
+    }
+  }
+  // Reset any active filters
+  document.querySelectorAll('.col-filter-popup').forEach(p => p.classList.remove('show'));
+  document.querySelectorAll('.col-filter-btn').forEach(function(b){ b.classList.remove('active','filtering'); });
+  var ftCount = $('filterCount');
+  if (ftCount) ftCount.remove();
+}
+
+// Infinite scroll for diff results
+function setupInfiniteScroll() {
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        loadMoreRows();
+      }
+    });
+  }, { root: $('diffTableContainer'), threshold: 0.1 });
+
+  var sentinel = $('scrollSentinel');
+  if (sentinel) observer.observe(sentinel);
+}
+
+function loadMoreRows() {
+  var db = $('diffBody');
+  if (!db || !db._allRows) return;
+  var allRows = db._allRows;
+  var loaded = db._loadedCount;
+  var pageSize = db._pageSize;
+  var commonFields = db._commonFields;
+  var compareKeyFields = db._compareKeyFields;
+
+  if (loaded >= allRows.length) {
+    var sentinel = $('scrollSentinel');
+    if (sentinel) sentinel.innerHTML = '<td colspan=\"'+(1+compareKeyFields.length+commonFields.length+1)+'\" style=\"text-align:center;color:#888;padding:8px;\">已加载全部 '+allRows.length+' 条</td>';
+    return;
+  }
+
+  var nextBatch = Math.min(loaded + pageSize, allRows.length);
+  var html = '';
+  for (var i = loaded; i < nextBatch; i++) {
+    var r = allRows[i];
+    var keyParts = (r.key || '').split('||');
+    html += '<tr class=\"diff-row\">';
+    html += '<td class=\"num\">'+(i+1)+'</td>';
+    keyParts.forEach(function(kp){ html += '<td>'+esc(kp)+'</td>'; });
+    (r.diffs || []).forEach(function(d){
+      var sv = String(d.sourceVal || ''); var cv = String(d.compareVal || '');
+      var isNullA = sv === 'null'; var isOnlyA = sv.indexOf('无此记录')!==-1;
+      var isRefFieldOnlyA = sv.indexOf('参考标准文件无此字段')!==-1;
+      var isFieldOnlyA = sv.indexOf('无此字段')!==-1 && !isRefFieldOnlyA;
+      var isNullB = cv === 'null'; var isOnlyB = cv.indexOf('无此记录')!==-1;
+      var isFieldOnlyB = cv.indexOf('无此字段')!==-1;
+      var aStyle = isNullA ? 'diff-missing' : (isOnlyA ? 'diff-only' : (isRefFieldOnlyA ? 'diff-match' : (isFieldOnlyA ? 'diff-only' : 'diff-match')));
+      var bStyle = d.match ? 'diff-match' : (isNullB ? 'diff-missing' : (isOnlyB ? 'diff-only' : (isFieldOnlyB ? 'diff-only' : 'diff-mismatch')));
+      html += '<td class=\"num diff-cell\"><span class=\"'+aStyle+'\">'+esc(sv)+'</span><br><span class=\"'+bStyle+'\">'+esc(cv)+'</span></td>';
+    });
+    html += '<td class=\"num\">'+(r.allMatch ? '&#10004;' : '&#10008;')+'</td>';
+    html += '</tr>';
+  }
+  db._loadedCount = nextBatch;
+
+  // Remove sentinel, append new rows, re-add sentinel
+  var sentinel = $('scrollSentinel');
+  if (sentinel) sentinel.remove();
+  db.insertAdjacentHTML('beforeend', html);
+
+  if (nextBatch < allRows.length) {
+    var newSentinel = document.createElement('tr');
+    newSentinel.id = 'scrollSentinel';
+    newSentinel.innerHTML = '<td colspan=\"'+(1+compareKeyFields.length+commonFields.length+1)+'\" style=\"text-align:center;color:#888;padding:8px;\">向下滚动加载更多...（已加载 '+nextBatch+'/'+allRows.length+'）</td>';
+    db.appendChild(newSentinel);
+    setupInfiniteScroll();
+  } else {
+    var doneSentinel = document.createElement('tr');
+    doneSentinel.innerHTML = '<td colspan=\"'+(1+compareKeyFields.length+commonFields.length+1)+'\" style=\"text-align:center;color:#888;padding:8px;\">已全部加载 '+allRows.length+' 条</td>';
+    db.appendChild(doneSentinel);
+  }
+}
+
+// Column filter functions
+function toggleColFilter(e, field) {
+  e.stopPropagation();
+  var popup = e.target.parentElement.querySelector('.col-filter-popup');
+  if (!popup) {
+    // fallback: find by ID
+    popup = document.getElementById('filter_'+field);
+  }
+  var btn = e.target.closest('.col-filter-btn') || e.target;
+  var wasOpen = popup && popup.classList.contains('show');
+  document.querySelectorAll('.col-filter-popup').forEach(function(p){ p.classList.remove('show'); });
+  document.querySelectorAll('.col-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (!wasOpen && popup) {
+    popup.classList.add('show');
+    btn.classList.add('active');
+    var inp = popup.querySelector('input'); if (inp) inp.focus();
+  }
+}
+
+function applyColFilter(field, val) {
+  var rows = $('diffBody').querySelectorAll('.diff-row');
+  var visible = 0;
+  rows.forEach(function(row) {
+    var cells = row.querySelectorAll('.diff-cell');
+    var cell = null;
+    cells.forEach(function(c){ if (c.getAttribute('data-field') === field) cell = c; });
+    if (!cell) return;
+    var cellVal = (cell.getAttribute('data-val') || '').toLowerCase();
+    var match = !val || cellVal.indexOf(val.toLowerCase()) !== -1;
+    row.classList.toggle('filtered-row', !match);
+    if (match) visible++;
+  });
+
+  // Show filter count at top-right of table area
+  let ftCount = $('filterCount');
+  if (!ftCount) {
+    ftCount = document.createElement('div');
+    ftCount.id = 'filterCount';
+    ftCount.className = 'filter-count';
+    ftCount.style.cssText = 'text-align:right;margin-bottom:4px;';
+    var container = $('diffTableContainer');
+    if (container) container.insertBefore(ftCount, container.firstChild);
+  }
+  // Highlight filter icon on active filter
+  document.querySelectorAll('.col-filter-btn').forEach(function(b){ b.classList.remove('filtering'); });
+  if (val) {
+    document.querySelectorAll('.col-filter-popup').forEach(function(p){
+      if (p.querySelector('input') && p.querySelector('input').value) {
+        var fb = p.parentElement.querySelector('.col-filter-btn');
+        if (fb) fb.classList.add('filtering');
+      }
+    });
+  }
+  if (val) ftCount.textContent = '筛选结果: '+visible+' 行';
+  else ftCount.textContent = '';
+}
+
+function clearColFilter(field) {
+  var popup = document.getElementById('filter_'+field.replace(/'/g,''));
+  if (!popup) {
+    // Try finding by parent th text
+    document.querySelectorAll('.col-filter-popup').forEach(function(p){
+      if (p.parentElement.textContent.indexOf(field) !== -1) popup = p;
+    });
+  }
+  if (popup) {
+    popup.querySelector('input').value = '';
+    popup.classList.remove('show');
+  }
+  document.querySelectorAll('.col-filter-btn').forEach(function(b){ b.classList.remove('active','filtering'); });
+  var body = $('diffBody');
+  if (body) body.querySelectorAll('.filtered-row').forEach(function(r){ r.classList.remove('filtered-row'); });
+  var ftCount = $('filterCount');
+  if (ftCount) ftCount.remove();
+}
+
+// Close filter popups on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.col-filter-btn') && !e.target.closest('.col-filter-popup')) {
+    document.querySelectorAll('.col-filter-popup').forEach(p => p.classList.remove('show'));
+    document.querySelectorAll('.col-filter-btn').forEach(b => b.classList.remove('active'));
+  }
+});
+
+// Share
+$('btnShare').addEventListener('click', () => {
+  const state = {
+    source: (sourceRawAll && sourceRawAll.all) || sourceRaw,
+    compare: (compareRawAll && compareRawAll.all) || compareRaw,
+    sourceFileName, compareFileName,
+    keyFields: compareKeyFields,
+    compareFields: compareFields,
+    sql: getSqlText(),
+    images: imageDataUrls,
+    attachments: attachments,
+    sourceFileDataUrl: sourceFileDataUrl,
+    compareFileDataUrl: compareFileDataUrl,
+    srcHeaderRow: $('srcHeaderRow').value,
+    srcDataStartCol: $('srcDataStartCol').value,
+    cmpHeaderRow: $('cmpHeaderRow').value,
+    cmpDataStartCol: $('cmpDataStartCol').value
+  };
+  const htmlContent = document.documentElement.outerHTML.replace('</head>',
+    '<script>window.__SHARED_DATA__ = '+JSON.stringify(state).replace(/<\//g,'<\\/')+';<\/script></head>');
+  const blob = new Blob([htmlContent], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (pageName || '数据对比')+'(share)_'+new Date().toISOString().slice(0,10)+'.html';
+  a.click();
+  showToast('已导出分享文件');
+});
+function showToast(msg) { $('shareToast').textContent=msg; $('shareToast').classList.add('show'); setTimeout(()=>$('shareToast').classList.remove('show'),3000); }
+
+// Fullscreen
+function openFullscreen(btn) {
+  const box = btn.closest('.preview-box');
+  const title = box.querySelector('h3').textContent;
+  const origTable = box.querySelector('.preview-table');
+  const allData = origTable._fullData;
+  const overlay = document.createElement('div');
+  overlay.className = 'preview-fullscreen';
+  overlay.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;"><h2>'+title+'</h2><span style="font-size:12px;color:#f59e0b;font-weight:700;">&#9432; 字段宽度可调整（拖拽表头列边缘）</span></div><div style="display:flex;align-items:center;gap:8px;"><div style="display:flex;gap:4px;align-items:center;"><input type="text" id="fsSearchInput" placeholder="搜索..." oninput="fsSearch(this)" style="padding:5px 8px;border:1px solid #d2e3fc;border-radius:3px;font-size:11px;width:320px;outline:none;"><span id="fsSearchCount" style="font-size:10px;color:#888;"></span><button onclick="fsSearchPrev(this)" style="padding:2px 6px;border:1px solid #ddd;border-radius:3px;background:#fff;cursor:pointer;font-size:10px;">&#9650;</button><button onclick="fsSearchNext(this)" style="padding:2px 6px;border:1px solid #ddd;border-radius:3px;background:#fff;cursor:pointer;font-size:10px;">&#9660;</button></div><button class="fullscreen-close" onclick="this.closest(\'.preview-fullscreen\').remove()" style="font-size:13px;font-weight:700;cursor:pointer;background:#4f8ef7;color:#fff;border:2px solid #4f8ef7;border-radius:4px;padding:4px 12px;">&#10005; 关闭</button></div></div>';
+  const clonedWrap = document.createElement('div'); clonedWrap.className = 'preview-wrap'; clonedWrap.style.display='';
+  const fsTable = document.createElement('table'); fsTable.className = 'preview-table';
+  clonedWrap.appendChild(fsTable);
+  overlay.appendChild(clonedWrap);
+  // Add footer with pagination
+  var footer = document.createElement('div');
+  footer.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:12px;';
+  footer.innerHTML = '<span id="fsPageInfo2" style="font-size:12px;color:#333;"></span><button onclick="fsPrevPage(this)" id="fsPrevBtn2" style="padding:4px 10px;border:1px solid #ddd;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;color:#333;">上一页</button><button onclick="fsNextPage(this)" id="fsNextBtn2" style="padding:4px 10px;border:1px solid #ddd;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;color:#333;">下一页</button>';
+  overlay.appendChild(footer);
+  document.body.appendChild(overlay);
+  // Store full data and render first page (200 rows)
+  fsTable._fullData = allData;
+  fsTable._pageSize = 200;
+  if (allData && allData.length > 1) {
+    var pg = renderPage(fsTable, 0);
+    if (pg) updateFsPager(overlay, pg);
+  } else if (origTable._fullData && origTable._fullData.length > 1) {
+    // Fallback: use original table data
+    fsTable._fullData = origTable._fullData;
+    fsTable._pageSize = 200;
+    var pg = renderPage(fsTable, 0);
+    if (pg) updateFsPager(overlay, pg);
+  } else {
+    fsTable.innerHTML = '<tr><td style=\"text-align:center;color:#888;padding:20px;\">暂无可预览数据</td></tr>';
+  }
+  fsTable.style.tableLayout = 'auto';
+  fsTable.style.width = '100%';
+  initColResize(fsTable);
+}
+
+function updateFsPager(overlay, pg) {
+  var btns = overlay.querySelectorAll('[id^="fsPageInfo"],[id^="fsPrevBtn"],[id^="fsNextBtn"]');
+  btns.forEach(function(el){
+    if (el.id.indexOf('fsPageInfo')===0) el.textContent = (pg.start+1)+'-'+(pg.end+1)+' / 共'+(pg.totalPages*200)+'条';
+    if (el.id.indexOf('fsPrevBtn')===0) el.disabled = pg.page <= 0;
+    if (el.id.indexOf('fsNextBtn')===0) el.disabled = pg.page >= pg.totalPages - 1;
+  });
+}
+
+// Fullscreen search
+function fsSearch(input) {
+  var ov = input.closest('.preview-fullscreen');
+  var table = ov.querySelector('.preview-table');
+  var cells = table.querySelectorAll('td');
+  var kw = input.value.trim();
+  // Restore original text if no keyword
+  cells.forEach(function(td){
+    if (td._origText !== undefined) { td.innerHTML = td._origText; delete td._origText; }
+    td.classList.remove('fs-hl','fs-hl-current');
+  });
+  var matches = [];
+  if (kw) {
+    cells.forEach(function(td){
+      var txt = td.textContent;
+      if (txt.toLowerCase().indexOf(kw.toLowerCase()) !== -1) {
+        if (td._origText === undefined) td._origText = td.innerHTML;
+        var re = new RegExp('('+escRegex(kw)+')', 'gi');
+        td.innerHTML = td._origText.replace(re, '<b class="fs-match-text">$1</b>');
+        td.classList.add('fs-hl');
+        matches.push(td);
+      }
+    });
+  }
+  ov._fsMatches = matches;
+  ov._fsIdx = matches.length > 0 ? 0 : -1;
+  var countEl = ov.querySelector('#fsSearchCount');
+  if (countEl) countEl.textContent = matches.length > 0 ? (ov._fsIdx+1)+'/'+matches.length : '0';
+  if (matches.length > 0) {
+    matches[0].classList.add('fs-hl-current');
+    matches[0].scrollIntoView({block:'nearest',inline:'nearest'});
+  }
+}
+function fsNav(ov, dir) {
+  var matches = ov._fsMatches || [];
+  if (!matches.length) return;
+  matches.forEach(function(td){ td.classList.remove('fs-hl-current'); });
+  var idx = (ov._fsIdx||0) + dir;
+  if (idx < 0) idx = matches.length - 1;
+  if (idx >= matches.length) idx = 0;
+  ov._fsIdx = idx;
+  matches[idx].classList.add('fs-hl-current');
+  matches[idx].scrollIntoView({block:'nearest',inline:'nearest'});
+  var countEl = ov.querySelector('#fsSearchCount');
+  if (countEl) countEl.textContent = (idx+1)+'/'+matches.length;
+}
+function escRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function fsSearchNext(btn) { fsNav(btn.closest('.preview-fullscreen'), 1); }
+function fsSearchPrev(btn) { fsNav(btn.closest('.preview-fullscreen'), -1); }
+
+function fsPrevPage(btn) {
+  var overlay = btn.closest('.preview-fullscreen');
+  var table = overlay.querySelector('.preview-table');
+  var pg = renderPage(table, (table._page||0) - 1);
+  updateFsPager(overlay, pg);
+}
+
+function fsNextPage(btn) {
+  var overlay = btn.closest('.preview-fullscreen');
+  var table = overlay.querySelector('.preview-table');
+  var pg = renderPage(table, (table._page||0) + 1);
+  updateFsPager(overlay, pg);
+}
+
+// Load shared data
+(function loadSharedData() {
+  if (window.__SHARED_DATA__) {
+    const state = window.__SHARED_DATA__;
+    document.body.classList.add('shared-mode');
+    // Force hide header buttons
+    var hb = document.querySelector('.header-btns');
+    if (hb) hb.style.display = 'none';
+    if (state.sql) { setSqlText(state.sql); }
+    if (state.images && state.images.length) { imageDataUrls = state.images; renderImages(); }
+    if (state.attachments) { attachments = state.attachments; renderAttachments(); }
+    if (state.srcHeaderRow) $('srcHeaderRow').value = state.srcHeaderRow;
+    if (state.srcDataStartCol) $('srcDataStartCol').value = state.srcDataStartCol;
+    if (state.cmpHeaderRow) $('cmpHeaderRow').value = state.cmpHeaderRow;
+    if (state.cmpDataStartCol) $('cmpDataStartCol').value = state.cmpDataStartCol;
+    if (state.source) { processDataFromRaw(state.source, state.sourceFileName, 'source', state); }
+    if (state.compare) { processDataFromRaw(state.compare, state.compareFileName, 'compare', state); }
+    // Restore file download links
+    if (state.sourceFileDataUrl) { sourceFileDataUrl = state.sourceFileDataUrl; restoreFileLink('source'); }
+    if (state.compareFileDataUrl) { compareFileDataUrl = state.compareFileDataUrl; restoreFileLink('compare'); }
+    return;
+  }
+})();
+
+function processDataFromRaw(all, fname, type, state) {
+  if (!all || !all.length) return;
+  // Apply row/col config using parseData
+  var parsed = parseData(all, type);
+  if (type === 'source') {
+    sourceHeaders = parsed.preview[0]||[]; sourceData = parsed.json; sourceRaw = parsed.preview; sourceFileName = fname||'';
+    sourceRawAll = {all: all};
+    renderPreview(parsed.preview, $('previewSection'), $('previewInfo'), $('previewTable'));
+  } else {
+    compareHeaders = parsed.preview[0]||[]; compareData = parsed.json; compareRaw = parsed.preview; compareFileName = fname||'';
+    compareRawAll = {all: all};
+    renderPreview(parsed.preview, $('previewSectionCompare'), $('previewInfoCompare'), $('previewTableCompare'));
+  }
+  if (state && state.keyFields) { compareKeyFields = state.keyFields; }
+  if (state && state.compareFields) { compareFields = state.compareFields; }
+  buildKeyConfig();
+  tryCompare();
+}
+
+function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return String(s===null||s===undefined?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+</script>
+</body>
+</html>
